@@ -1,50 +1,19 @@
 #!/bin/bash
-# login.sh — login Google Flow untuk gflow, dibikin semudah mungkin.
+# login.sh — login Google Flow, pilih cara paling gampang buatmu.
 #
-# Masalah: `gflow auth login` membuka jendela Chrome asli. Di server
-# headless (tanpa layar) jendela itu tidak bisa dilihat. Solusinya:
-# login SEKALI di komputer yang ada layarnya (laptop/PC), lalu pindahkan
-# profil login (.gflow/) ke server pakai script ini.
-#
-# Pakai:
-#   ./login.sh                 # otomatis: langsung login bila ada layar,
-#                              #   atau pandu transfer profil bila headless
-#   ./login.sh --pack          # di LAPTOP: kemas profil login jadi .tgz
-#   ./login.sh --unpack FILE   # di SERVER: pasang profil dari .tgz
-#   ./login.sh --check         # cek sesi masih valid (gflow doctor)
+#   ./login.sh                        # menu interaktif
+#   ./login.sh --direct               # langsung: butuh layar di mesin ini
+#   ./login.sh --import-cookies F     # dari export Cookie-Editor (JSON/txt)
+#   ./login.sh --vnc                  # VNC + link Cloudflare, login di browser HP
+#   ./login.sh --pack                 # kemas profil (di laptop yg ada layar)
+#   ./login.sh --unpack FILE          # pasang profil (di server)
+#   ./login.sh --check                # cek sesi masih valid
 set -e
 cd "$(dirname "$0")"
 
 PROFILE_DIR=".gflow/profiles/default"
 
-has_display() {
-  [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]
-}
-
-pack() {
-  if [ ! -d "$PROFILE_DIR" ]; then
-    echo "Belum ada profil login di $PROFILE_DIR."
-    echo "Jalankan './login.sh' dulu di komputer ini untuk login."
-    exit 1
-  fi
-  OUT="gflow-login-$(date +%Y%m%d).tgz"
-  tar czf "$OUT" .gflow
-  echo ""
-  echo "✔ Profil dikemas: $OUT  ($(du -h "$OUT" | cut -f1))"
-  echo ""
-  echo "Kirim file ini ke server, misal:"
-  echo "  scp $OUT user@server:/path/gflow-affiliate/"
-  echo "Lalu di server jalankan:"
-  echo "  ./login.sh --unpack $OUT"
-}
-
-unpack() {
-  FILE="$1"
-  [ -f "$FILE" ] || { echo "File tidak ketemu: $FILE"; exit 1; }
-  tar xzf "$FILE"
-  echo "✔ Profil dipasang."
-  check
-}
+has_display() { [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; }
 
 check() {
   echo "== cek sesi Flow =="
@@ -53,58 +22,101 @@ check() {
     exit 1
   fi
   if gflow doctor; then
-    echo ""
-    echo "✔ Sesi valid. Pipeline siap jalan."
+    echo ""; echo "✔ Sesi valid. Pipeline siap jalan."
   else
-    echo ""
-    echo "✘ Sesi belum valid. Jalankan ./login.sh untuk login."
+    echo ""; echo "✘ Sesi belum valid. Coba cara login lain: ./login.sh"
     exit 1
   fi
 }
 
 direct_login() {
-  echo "== login langsung (terdeteksi ada layar) =="
+  echo "== login langsung =="
   echo "Jendela Chrome akan muncul — selesaikan login Google di sana."
-  echo ""
   gflow auth login
   check
 }
 
-guide_headless() {
+import_cookies() {
+  local file="$1" extra="${2:-}"
+  [ -f "$file" ] || { echo "File tidak ketemu: $file"; exit 1; }
   cat <<'EOF'
-== server ini headless (tanpa layar) ==
+== import cookies ==
+Cara dapat file-nya (sekali aja, di Chrome HP/laptop yang sudah login Google):
+  1. Install ekstensi "Cookie-Editor"
+  2. Buka accounts.google.com → klik ikon Cookie-Editor → Export (format JSON)
+  3. Simpan sebagai cookies.json, kirim file-nya ke folder repo ini
+EOF
+  python3 lib/cookies_import.py "$file" $extra
+  echo ""
+  echo "Profil terisi cookie. Verifikasi sesi..."
+  check
+}
 
-gflow butuh login Google di Chrome asli, jadi loginnya dilakukan
-SEKALI di komputer yang ada layarnya (laptop/PC), lalu profilnya
-dipindah ke sini. Caranya:
+vnc_login() {
+  echo "== login via VNC =="
+  ./vnc.sh start
+}
 
-  DI LAPTOP/PC (yang ada layar):
-    1. git clone repo ini (atau copy foldernya)
-    2. ./login.sh            # login di jendela Chrome yang muncul
-    3. ./login.sh --pack     # kemas profil -> gflow-login-<tgl>.tgz
+pack() {
+  if [ ! -d "$PROFILE_DIR" ]; then
+    echo "Belum ada profil login di $PROFILE_DIR."
+    echo "Jalankan './login.sh --direct' dulu di komputer ini untuk login."
+    exit 1
+  fi
+  OUT="gflow-login-$(date +%Y%m%d).tgz"
+  tar czf "$OUT" .gflow
+  echo ""
+  echo "✔ Profil dikemas: $OUT ($(du -h "$OUT" | cut -f1))"
+  echo "Kirim ke server, lalu di server: ./login.sh --unpack $OUT"
+}
+
+unpack() {
+  local file="$1"
+  [ -f "$file" ] || { echo "File tidak ketemu: $file"; exit 1; }
+  tar xzf "$file"
+  echo "✔ Profil dipasang."
+  check
+}
+
+menu() {
+  if has_display; then direct_login; return; fi
+  cat <<'EOF'
+== pilih cara login Google Flow ==
+
+  1) Import cookies (Cookie-Editor) — paling cepat, tanpa layar
+  2) VNC via link Cloudflare         — login manual di browser HP
+  3) Pindah profil dari laptop        — login di laptop, kirim .tgz ke sini
+
+EOF
+  read -rp "Pilih [1/2/3]: " c
+  case "$c" in
+    1) read -rp "Path file cookies.json: " f
+       read -rp "Impor semua domain? (default cuma *google*) [y/N]: " a
+       [ "$a" = "y" ] || [ "$a" = "Y" ] && extra="--all-domains" || extra=""
+       import_cookies "$f" "$extra" ;;
+    2) vnc_login ;;
+    3) cat <<'EOF'
+
+  DI LAPTOP (ada layar):
+    ./login.sh --direct     # login di Chrome yang muncul
+    ./login.sh --pack        # -> gflow-login-<tgl>.tgz
 
   DI SERVER INI:
-    4. copy file .tgz ke folder repo ini (scp / upload)
-    5. ./login.sh --unpack gflow-login-<tgl>.tgz
-
-  Selesai — profil login pindah, tidak perlu login ulang di server.
-  (Profil = folder .gflow/, isinya cookie sesi; aman selama di tanganmu.)
-
-Alternatif: bila laptop bisa SSH dengan X-forwarding:
-    ssh -X user@server, lalu ./login.sh   # jendela Chrome diteruskan ke laptop
+    copy file .tgz ke folder repo ini, lalu:
+    ./login.sh --unpack gflow-login-<tgl>.tgz
 EOF
+       ;;
+    *) echo "Batal." ;;
+  esac
 }
 
 case "${1:-}" in
-  --pack)   pack ;;
-  --unpack) unpack "$2" ;;
-  --check)  check ;;
-  "")
-    if has_display; then
-      direct_login
-    else
-      guide_headless
-    fi
-    ;;
-  *) echo "Pakai: ./login.sh [--pack|--unpack FILE|--check]"; exit 1 ;;
+  --direct)          direct_login ;;
+  --import-cookies)  import_cookies "$2" "${3:-}" ;;
+  --vnc)             vnc_login ;;
+  --pack)            pack ;;
+  --unpack)          unpack "$2" ;;
+  --check)           check ;;
+  "")                menu ;;
+  *) echo "Pakai: ./login.sh [--direct|--import-cookies FILE|--vnc|--pack|--unpack FILE|--check]"; exit 1 ;;
 esac

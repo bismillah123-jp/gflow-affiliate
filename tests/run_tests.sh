@@ -8,6 +8,9 @@ echo ""
 echo "== test tts (edge-tts dipalsukan) =="
 python3 -m unittest tests.test_tts -v 2>&1 | tail -5
 echo ""
+echo "== test cookies import =="
+python3 -m unittest tests.test_cookies -v 2>&1 | tail -5
+echo ""
 echo "== test dry-run end-to-end =="
 python3 -m unittest tests.test_dryrun -v 2>&1 | tail -5
 echo ""

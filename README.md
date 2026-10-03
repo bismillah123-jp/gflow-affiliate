@@ -64,33 +64,45 @@ git clone <repo-ini> && cd gflow-affiliate
 ./login.sh            # login Google Flow (dipandu, sekali aja)
 ```
 
-## 🔑 Login (sekali per mesin)
+## 🔑 Login (sekali per mesin) — pilih yang paling gampang
 
 ```bash
-./login.sh            # pintar: langsung login bila ada layar,
-                      #   atau pandu pindah profil bila headless
-./login.sh --check    # cek sesi masih valid
+./login.sh            # menu: pilih cara login
 ```
 
-**Di laptop/PC (ada layar):** `./login.sh` → jendela Chrome muncul →
-login Google → selesai.
-
-**Di server tanpa layar (VPS):** login tidak bisa dimunculkan di sana,
-jadi login dilakukan sekali di laptop, profilnya dipindah:
-
+**Opsi 1 — Import cookies (paling cepat, tanpa layar).**
+Di Chrome HP/laptop yang sudah login Google: install ekstensi
+"Cookie-Editor" → buka `accounts.google.com` → Export (JSON) →
+kirim `cookies.json` ke folder repo ini, lalu:
 ```bash
-# DI LAPTOP:
-./login.sh            # login di Chrome yang muncul
-./login.sh --pack     # -> gflow-login-20261003.tgz
+./login.sh --import-cookies cookies.json
+```
+Script menulis cookie ke profil gflow dengan enkripsi yang sama
+persis seperti Chrome Linux, lalu verifikasi via `gflow doctor`.
 
-# DI SERVER (copy file .tgz ke folder repo dulu):
-./login.sh --unpack gflow-login-20261003.tgz
+**Opsi 2 — VNC via link Cloudflare (login manual di browser HP).**
+```bash
+./login.sh --vnc
+```
+Muncul link `https://vnc.sirihsan.my.id/vnc.html` — buka di HP,
+masukkan password VNC, buka Terminal di dalam VNC, lalu:
+```bash
+cd ~/workspace/gflow-affiliate && ./login.sh   # login di Chrome yang muncul
+./vnc.sh stop                                    # matikan VNC setelah selesai
+```
+Agar link publik jalan, tambahkan sekali di dashboard Cloudflare
+(Zero Trust → Tunnels → Public Hostname): `vnc.sirihsan.my.id` →
+`http://127.0.0.1:6080`. Jangan biarkan VNC nyala terus.
+
+**Opsi 3 — Pindah profil dari laptop (ada layar).**
+```bash
+# di LAPTOP:  ./login.sh --direct   # login di Chrome yang muncul
+#             ./login.sh --pack      # -> gflow-login-<tgl>.tgz
+# di SERVER:  ./login.sh --unpack gflow-login-<tgl>.tgz
 ```
 
-Profil (`.gflow/`) cuma berisi cookie sesi — aman selama di tanganmu,
-jangan di-commit (sudah di `.gitignore`). Pipeline juga otomatis
-`preflight` (cek `gflow doctor`) sebelum tahap berat jalan, jadi kalau
-sesi mati kamu langsung dapat pesan jelas, bukan error misterius.
+Cek kapan saja: `./login.sh --check`. Pipeline juga otomatis
+`preflight` (`gflow doctor`) sebelum tahap berat jalan.
 
 Butuh: Python 3.10+, Node.js 20+, Google Chrome, ffmpeg, internet.
 
