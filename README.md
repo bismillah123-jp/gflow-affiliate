@@ -42,9 +42,9 @@ riset → images → hd → storyboard → video → tts → finish
 Jujur dulu biar ekspektasi pas:
 
 1. **Login Google sekali per mesin** — `gflow` mengendalikan Chrome +
-   sesi Google Flow milikmu. Jalankan `gflow auth login`, login manual
-   di jendela yang muncul, lalu `gflow doctor`. Setelah itu semuanya
-   bisa `--no-headed` (otomatis).
+   sesi Google Flow milikmu. Jalankan `./login.sh` (otomatis dipandu:
+   langsung login bila ada layar, atau pindah profil dari laptop bila
+   headless). Setelah itu semuanya bisa `--no-headed` (otomatis).
 2. **Kuota Flow** — generate gambar/video memakan kredit Flow; butuh
    akun/paket Flow yang aktif.
 3. **Anti-anomali = best-effort** — prompt guard + referensi karakter
@@ -61,9 +61,36 @@ Jujur dulu biar ekspektasi pas:
 ```bash
 git clone <repo-ini> && cd gflow-affiliate
 ./setup.sh            # venv .venv + dependensi + gflow-cli
-gflow auth login      # login Google (interaktif, sekali aja)
-gflow doctor          # verifikasi sesi
+./login.sh            # login Google Flow (dipandu, sekali aja)
 ```
+
+## 🔑 Login (sekali per mesin)
+
+```bash
+./login.sh            # pintar: langsung login bila ada layar,
+                      #   atau pandu pindah profil bila headless
+./login.sh --check    # cek sesi masih valid
+```
+
+**Di laptop/PC (ada layar):** `./login.sh` → jendela Chrome muncul →
+login Google → selesai.
+
+**Di server tanpa layar (VPS):** login tidak bisa dimunculkan di sana,
+jadi login dilakukan sekali di laptop, profilnya dipindah:
+
+```bash
+# DI LAPTOP:
+./login.sh            # login di Chrome yang muncul
+./login.sh --pack     # -> gflow-login-20261003.tgz
+
+# DI SERVER (copy file .tgz ke folder repo dulu):
+./login.sh --unpack gflow-login-20261003.tgz
+```
+
+Profil (`.gflow/`) cuma berisi cookie sesi — aman selama di tanganmu,
+jangan di-commit (sudah di `.gitignore`). Pipeline juga otomatis
+`preflight` (cek `gflow doctor`) sebelum tahap berat jalan, jadi kalau
+sesi mati kamu langsung dapat pesan jelas, bukan error misterius.
 
 Butuh: Python 3.10+, Node.js 20+, Google Chrome, ffmpeg, internet.
 
@@ -169,7 +196,7 @@ VO di-mix, opsional `drawtext` overlay, verifikasi stream video+audio.
 | Gejala | Solusi |
 |---|---|
 | `gflow: command not found` | `npm install -g @swissmarley/gflow-cli` |
-| `Google Flow login is required` | `gflow auth login`, selesaikan login, `gflow doctor` |
+| `Google Flow login is required` | `./login.sh` (atau manual: `gflow auth login` → `gflow doctor`) |
 | Tangan/jari aneh di hasil | Perketat `ANOMALY_GUARD` di `lib/prompts.py`; generate ulang scene |
 | Produk berubah di video | Pastikan character `aff-<slug>` terbuat (`gflow character list`); pakai gambar katalog yang jelas |
 | VO kepanjangan | Sudah auto rate-fit; bila masih, pendekkan `vo_line` di override storyboard |

@@ -46,6 +46,19 @@ def sh(*cmd: str) -> None:
         die(f"tahap gagal (exit {r.returncode}): {cmd[1]}")
 
 
+def preflight() -> None:
+    """Pastikan sesi gflow valid SEBELUM tahap berat jalan."""
+    import subprocess
+    log("preflight: cek sesi gflow ...")
+    r = subprocess.run(["gflow", "doctor"],
+                       capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        die("sesi Google Flow belum valid.\n"
+            "  Jalankan:  ./login.sh\n"
+            "  (di server headless: ./login.sh --unpack <file-profil>)")
+    log("preflight OK: sesi gflow valid")
+
+
 def main() -> None:
     a = argparse.ArgumentParser(description="Pipeline video affiliate otomatis")
     a.add_argument("--product", default="",
@@ -137,6 +150,11 @@ def main() -> None:
     if slug is None and "research" not in stages:
         die("--auto/--manual-name butuh tahap research untuk resolve slug; "
             "pakai --product <slug> bila mulai dari tengah")
+
+    # preflight gflow sekali sebelum tahap yang butuh browser
+    GFLOW_STAGES = {"hd", "storyboard", "video"}
+    if not args.dry_run and any(s in GFLOW_STAGES for s in stages):
+        preflight()
 
     if "research" in stages:
         stage_research()
