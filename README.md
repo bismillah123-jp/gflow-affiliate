@@ -80,19 +80,22 @@ kirim `cookies.json` ke folder repo ini, lalu:
 Script menulis cookie ke profil gflow dengan enkripsi yang sama
 persis seperti Chrome Linux, lalu verifikasi via `gflow doctor`.
 
-**Opsi 2 — VNC via link Cloudflare (login manual di browser HP).**
+**Opsi 2 — VNC, link publik otomatis (tanpa setting apa pun).**
 ```bash
 ./login.sh --vnc
-# atau: VNC_HOSTNAME=vnc.domainmu.id ./vnc.sh start   (tampilkan link jadi)
 ```
-Script menampilkan URL yang harus dibuka — hostname publiknya ikut
-settingan tunnel Cloudflare-mu sendiri (petakan satu hostname ke
-`http://127.0.0.1:6080` di dashboard). Buka link di HP, masukkan
-password VNC, buka Terminal di dalam VNC, lalu:
+Script menyalakan VNC + mencoba bikin domain publik acak via Cloudflare
+Quick Tunnel, lalu menampilkan link jadi seperti
+`https://xxx.trycloudflare.com/vnc.html` — langsung buka di HP,
+masukkan password VNC, buka Terminal di dalam VNC, lalu:
 ```bash
 cd ~/workspace/gflow-affiliate && ./login.sh   # login di Chrome yang muncul
 ./vnc.sh stop                                    # matikan VNC setelah selesai
 ```
+Tidak perlu akun Cloudflare, tidak perlu setting dashboard. Link-nya
+acak & sementara — cukup untuk sekali login. Kalau jaringan di mesin
+itu memblokir tunnel otomatis, script akan bilang dan kamu tinggal
+petakan satu hostname tunnel-mu sendiri ke `http://127.0.0.1:6080`.
 Jangan biarkan VNC nyala terus.
 
 **Opsi 3 — Pindah profil dari laptop (ada layar).**

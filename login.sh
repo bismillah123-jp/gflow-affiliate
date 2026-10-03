@@ -84,7 +84,7 @@ menu() {
 == pilih cara login Google Flow ==
 
   1) Import cookies (Cookie-Editor) — paling cepat, tanpa layar
-  2) VNC via link Cloudflare         — login manual di browser HP
+  2) VNC, link publik otomatis      — tanpa setting, login di browser HP
   3) Pindah profil dari laptop        — login di laptop, kirim .tgz ke sini
 
 EOF
