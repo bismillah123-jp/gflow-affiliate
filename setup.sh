@@ -1,7 +1,6 @@
 #!/bin/bash
 # setup.sh — siapkan pipeline video affiliate di Linux manapun (sekali aja).
-# Membuat venv .venv, install dependensi Python + browser Playwright.
-# TANPA gflow-cli: Flow dikendalikan langsung via Playwright.
+# Membuat venv .venv, install gflow-cli (ffroliva) + dependensi + browser.
 set -e
 cd "$(dirname "$0")"
 

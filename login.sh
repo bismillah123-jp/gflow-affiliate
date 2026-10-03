@@ -1,10 +1,11 @@
 #!/bin/bash
 # login.sh — login Google Flow, pilih cara paling gampang buatmu.
-# TANPA gflow-cli: sesi disimpan di profil browser ~/.config/affiliate-flow
-# (dipakai langsung oleh pipeline.py via Playwright).
+# Memakai `gflow` CLI dari https://github.com/ffroliva/gflow-cli
+# (pip install gflow-cli). Sesi/profil di ~/.local/share/gflow-cli
+# (atau $GFLOW_CLI_HOME bila di-set).
 #
 #   ./login.sh                        # menu interaktif
-#   ./login.sh --direct               # langsung: butuh layar di mesin ini
+#   ./login.sh --direct               # langsung: gflow auth login
 #   ./login.sh --import-cookies F     # dari export Cookie-Editor (JSON/txt)
 #   ./login.sh --vnc                  # VNC + link Cloudflare, login di browser HP
 #   ./login.sh --pack                 # kemas profil (di laptop yg ada layar)
@@ -18,63 +19,42 @@ if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
   exit 1
 fi
 
-PROFILE_DIR="$HOME/.config/affiliate-flow"
-AUTH_MARKER="$PROFILE_DIR/.auth_ok"
+PROFILE_DIR="${GFLOW_CLI_HOME:-$HOME/.local/share/gflow-cli}"
+AUTH_HINT="python3 pipeline.py --auth   # = gflow auth login"
 
 has_display() { [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; }
 
+need_gflow() {
+  command -v gflow >/dev/null || {
+    echo "✘ perintah 'gflow' belum diinstall."
+    echo "  Install: pip install gflow-cli  (atau ./setup.sh)"
+    exit 1
+  }
+}
+
 check() {
   echo "== cek sesi Flow =="
-  if [ -f "$AUTH_MARKER" ]; then
-    echo ""; echo "✔ Sesi tersimpan di $PROFILE_DIR. Pipeline siap jalan."
+  need_gflow
+  if gflow doctor >/dev/null 2>&1; then
+    echo ""; echo "✔ Sesi valid. Pipeline siap jalan."
   else
-    echo ""; echo "✘ Belum login. Jalankan: python3 pipeline.py --auth"
-    echo "   (atau ./login.sh untuk cara lain)"
+    echo ""; echo "✘ Sesi belum valid."
+    gflow doctor 2>&1 | tail -5
+    echo "Coba: $AUTH_HINT"
     exit 1
   fi
 }
 
-FLOW_PROFILE_DIR="$HOME/.config/affiliate-flow"
 FLOW_URL="https://labs.google/fx/tools/flow"
-
-chrome_pids_for_profile() {
-  # trik [.] biar pgrep nggak match command-line-nya sendiri
-  pgrep -f "[.]config/affiliate-flow" 2>/dev/null | grep -vx "$$" || true
-}
 
 direct_login() {
   echo "== login langsung =="
-  # Bersihkan Chrome profil Flow yang nyangkut dari jalan sebelumnya.
-  local pids
-  pids=$(chrome_pids_for_profile)
-  if [ -n "$pids" ]; then
-    echo "Menutup Chrome profil Flow yang masih nyangkut..."
-    # shellcheck disable=SC2086
-    kill $pids 2>/dev/null || true
-    sleep 2
-    pkill -9 -f "[.]config/affiliate-flow" 2>/dev/null || true
-  fi
-  rm -f "$FLOW_PROFILE_DIR/SingletonLock" "$FLOW_PROFILE_DIR/SingletonCookie" \
-        "$FLOW_PROFILE_DIR/SingletonSocket" "$FLOW_PROFILE_DIR/DevToolsActivePort"
-  mkdir -p "$FLOW_PROFILE_DIR"
-
-  echo "Membuka SATU jendela Chrome login..."
-  # Luncurkan langsung supaya bisa pakai flag anti-crash di container/VNC.
-  local chrome_bin
-  chrome_bin=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
-  if [ -z "$chrome_bin" ]; then
-    echo "✘ Chrome/Chromium tidak ketemu. Install Google Chrome dulu."
-    exit 1
-  fi
-  "$chrome_bin" --user-data-dir="$FLOW_PROFILE_DIR" \
-    --no-first-run --no-default-browser-check \
-    --disable-dev-shm-usage --disable-gpu \
-    "$FLOW_URL" >/dev/null 2>&1 &
-  disown 2>/dev/null || true
+  need_gflow
+  echo "Membuka browser login (gflow auth login)..."
+  echo "Selesaikan login Google di jendela yang muncul."
   echo ""
-  echo "Selesaikan login Google di jendela Chrome tersebut,"
-  read -rp "lalu tekan ENTER di sini ... "
-  touch "$AUTH_MARKER"
+  gflow auth login
+  echo ""
   check
 }
 
@@ -106,7 +86,7 @@ pack() {
     exit 1
   fi
   OUT="flow-login-$(date +%Y%m%d).tgz"
-  tar czf "$OUT" -C "$HOME" .config/affiliate-flow
+  tar czf "$OUT" -C "$(dirname "$PROFILE_DIR")" "$(basename "$PROFILE_DIR")"
   echo ""
   echo "✔ Profil dikemas: $OUT ($(du -h "$OUT" | cut -f1))"
   echo "Kirim ke server, lalu di server: ./login.sh --unpack $OUT"
@@ -115,7 +95,8 @@ pack() {
 unpack() {
   local file="$1"
   [ -f "$file" ] || { echo "File tidak ketemu: $file"; exit 1; }
-  tar xzf "$file" -C "$HOME"
+  mkdir -p "$(dirname "$PROFILE_DIR")"
+  tar xzf "$file" -C "$(dirname "$PROFILE_DIR")"
   echo "✔ Profil dipasang."
   check
 }

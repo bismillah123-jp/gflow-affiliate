@@ -19,7 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import is_dry_run, log, die, product_dir, load_json  # noqa: E402
-import flow_browser as flow  # noqa: E402
+import flow_cli as flow  # noqa: E402
 
 DURATION = 10
 

@@ -2,7 +2,8 @@
 """
 pipeline.py — Pipeline otomatis video affiliate TikTok/Shopee via Google Flow.
 
-TANPA gflow-cli: Flow dikendalikan langsung via Playwright (lib/flow_browser.py).
+Memakai `gflow` CLI dari https://github.com/ffroliva/gflow-cli
+(Python, pip install gflow-cli) — BUKAN swissmarley/gflow-cli yang lama.
 
 Alur (7 tahap):
   1. research   : riset produk viral (curated/manual/trends)
@@ -17,8 +18,8 @@ Konsistensi produk dijaga via referensi visual `aff-<slug>` (ingredient).
 Anti-anomali via ANOMALY_GUARD di setiap prompt (lihat lib/prompts.py).
 
 Syarat sekali per mesin:
-  ./setup.sh                        # install deps + playwright chromium
-  python3 pipeline.py --auth        # login Google manual sekali, sesi tersimpan
+  ./setup.sh                        # install deps + gflow-cli + browser
+  python3 pipeline.py --auth        # = gflow auth login (sekali, sesi tersimpan)
 
 Pakai:
   python3 pipeline.py --auto                       # full pipeline, produk top viral
@@ -50,15 +51,18 @@ def sh(*cmd: str) -> None:
 
 
 def preflight() -> None:
-    """Pastikan user sudah login Flow SEBELUM tahap berat jalan."""
-    sys.path.insert(0, str(LIB))
-    from flow_browser import is_authed
-    log("preflight: cek sesi Flow ...")
-    if not is_authed():
-        die("belum login Google Flow.\n"
-            "  Jalankan sekali:  python3 pipeline.py --auth\n"
-            "  (browser kebuka — login Google manual, lalu tutup)")
-    log("preflight OK: sesi Flow tersimpan")
+    """Pastikan sesi gflow valid SEBELUM tahap berat jalan."""
+    import subprocess, shutil
+    log("preflight: cek sesi gflow ...")
+    if shutil.which("gflow") is None:
+        die("perintah `gflow` tidak ditemukan.\n"
+            "  Install: pip install gflow-cli  (atau ./setup.sh)")
+    r = subprocess.run(["gflow", "doctor"],
+                       capture_output=True, text=True, timeout=300)
+    if r.returncode != 0:
+        die("sesi Google Flow belum valid.\n"
+            "  Jalankan:  python3 pipeline.py --auth   (= gflow auth login)")
+    log("preflight OK: sesi gflow valid")
 
 
 def main() -> None:
@@ -88,9 +92,14 @@ def main() -> None:
         return
 
     if args.auth:
-        sys.path.insert(0, str(LIB))
-        from flow_browser import auth_interactive
-        auth_interactive()
+        import subprocess, shutil
+        if shutil.which("gflow") is None:
+            die("perintah `gflow` tidak ditemukan. Install: pip install gflow-cli")
+        log("menjalankan: gflow auth login (browser kebuka — login manual)")
+        r = subprocess.run(["gflow", "auth", "login"])
+        if r.returncode != 0:
+            die("gflow auth login gagal")
+        log("✔ login selesai")
         return
 
     if args.dry_run:

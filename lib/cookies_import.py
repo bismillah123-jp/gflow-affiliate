@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Import cookies (export dari ekstensi Cookie-Editor) ke profil browser Flow (~/.config/affiliate-flow).
+"""Import cookies (export dari ekstensi Cookie-Editor) ke profil browser gflow (~/.local/share/gflow-cli/profile_default).
 
 Kenapa ribet begini: Chrome di Linux mengenkripsi isi cookie di file
 `Cookies` (SQLite) pakai AES-128-CBC dengan kunci turunan dari password
@@ -20,7 +20,7 @@ Flow: accounts.google.com, .google.com, labs.google). Pakai
 Contoh:
   python3 lib/cookies_import.py cookies.json
   python3 lib/cookies_import.py cookies.json --all-domains
-  python3 lib/cookies_import.py cookies.txt --profile-dir ~/.config/affiliate-flow
+  python3 lib/cookies_import.py cookies.txt  # default: profil gflow
 """
 from __future__ import annotations
 
@@ -198,12 +198,16 @@ def import_cookies(src: Path, profile_dir: Path,
     return n
 
 
+def _default_profile() -> str:
+    home = os.environ.get("GFLOW_CLI_HOME",
+                          str(Path.home() / ".local" / "share" / "gflow-cli"))
+    return str(Path(home) / "profile_default")
+
+
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Import cookies ke profil browser Flow")
+    ap = argparse.ArgumentParser(description="Import cookies ke profil browser gflow")
     ap.add_argument("file", help="export JSON Cookie-Editor / cookies.txt")
-    ap.add_argument("--profile-dir",
-                    default=str(Path(__file__).resolve().parent.parent
-                                / ".config" / "affiliate-flow"))
+    ap.add_argument("--profile-dir", default=_default_profile())
     ap.add_argument("--all-domains", action="store_true",
                     help="impor semua domain, bukan cuma *google*")
     args = ap.parse_args()

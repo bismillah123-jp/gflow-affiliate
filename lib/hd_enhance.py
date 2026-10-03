@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import is_dry_run, log, die, product_dir, load_json  # noqa: E402
 from prompts import hd_prompt  # noqa: E402
-import flow_browser as flow  # noqa: E402
+import flow_cli as flow  # noqa: E402
 
 
 def main() -> None:
@@ -64,7 +64,8 @@ def main() -> None:
             out_png=str(out),
             model="Nano Banana 2",
             ratio="9:16",
-            character=char_name,
+            refs=[str(img)],          # i2i: gambar katalognya sendiri
+            character=char_name,       # + referensi identitas produk
             headed=a.headed)
     log("tahap HD selesai")
 
