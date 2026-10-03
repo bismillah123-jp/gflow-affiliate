@@ -34,10 +34,22 @@ check() {
   fi
 }
 
+chrome_login_running() {
+  pgrep -f "\.gflow/profiles/default" >/dev/null 2>&1
+}
+
 direct_login() {
   echo "== login langsung =="
-  echo "Jendela Chrome akan muncul — selesaikan login Google di sana."
-  gflow auth login
+  if chrome_login_running; then
+    echo "Chrome login sepertinya SUDAH terbuka (profil gflow sedang dipakai)."
+    echo "Selesaikan login Google di jendela itu."
+  else
+    echo "Membuka jendela Chrome..."
+    gflow auth login
+  fi
+  echo ""
+  echo "Selesaikan login Google di jendela Chrome tersebut,"
+  read -rp "lalu tekan ENTER di sini untuk verifikasi... "
   check
 }
 
