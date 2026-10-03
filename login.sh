@@ -54,7 +54,7 @@ EOF
 
 vnc_login() {
   echo "== login via VNC =="
-  ./vnc.sh start
+  bash -- ./vnc.sh start
 }
 
 pack() {
