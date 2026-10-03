@@ -8,6 +8,7 @@
 #   ./vnc.sh stop     # matikan semuanya (lakukan setelah login selesai)
 #   ./vnc.sh status   # cek status
 set -euo pipefail
+cd "$(dirname "$0")"
 
 DISPLAY_NUM="${VNC_DISPLAY:-99}"
 VNC_PORT=$((5900 + DISPLAY_NUM))
@@ -16,6 +17,16 @@ NOVNC_DIR="$HOME/.local/share/novnc"
 NOVNC_VER="v1.5.0"
 QUICK_LOG="/tmp/cloudflared-quick.log"
 export PATH="$HOME/.local/bin:$PATH"
+SUDO="sudo"; [ "$(id -u)" = "0" ] && SUDO=""
+
+# Jangan dijalankan via sudo: VNC harus milik user biasa, kalau root
+# nanti file profil .gflow jadi milik root dan pipeline user biasa gagal.
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+  echo "✘ Jangan pakai sudo untuk script ini."
+  echo "  Jalankan sebagai user biasa:  ./vnc.sh start"
+  echo "  (sudo hanya dipakai di dalam script saat install paket.)"
+  exit 1
+fi
 
 need_pkg() { dpkg -s "$1" >/dev/null 2>&1 || echo "$1"; }
 
@@ -33,17 +44,18 @@ ensure_cloudflared() {
 
 install_deps() {
   local missing=()
-  for p in tigervnc-standalone-server openbox xterm curl; do
+  for p in tigervnc-standalone-server tigervnc-common openbox xterm curl; do
     n=$(need_pkg "$p"); [ -n "$n" ] && missing+=("$n")
   done
   if [ "${#missing[@]}" -gt 0 ]; then
     echo "== install: ${missing[*]} =="
-    sudo apt-get update -qq
-    sudo apt-get install -y -qq "${missing[@]}"
+    $SUDO apt-get update -qq
+    $SUDO apt-get install -y -qq "${missing[@]}"
   fi
   python3 -c "import websockify" 2>/dev/null || {
     echo "== install websockify (pip --user) =="
-    pip install --quiet --user websockify
+    pip install --quiet --user --break-system-packages websockify 2>/dev/null \
+      || pip install --quiet --user websockify
   }
   if [ ! -f "$NOVNC_DIR/vnc.html" ]; then
     echo "== download noVNC $NOVNC_VER (sekali aja) =="
@@ -68,20 +80,42 @@ do_start() {
   if [ ! -f "$HOME/.vnc/passwd" ]; then
     echo "== set password VNC (dipakai untuk buka link) =="
     mkdir -p "$HOME/.vnc"
-    vncpasswd
+    while true; do
+      read -rsp "Password VNC: " VNC_PW; echo
+      read -rsp "Ulangi password: " VNC_PW2; echo
+      if [ -n "$VNC_PW" ] && [ "$VNC_PW" = "$VNC_PW2" ]; then break; fi
+      echo "Kosong/tidak cocok — coba lagi."
+    done
+    # Ubuntu 24.04 tidak menyediakan binary `vncpasswd`;
+    # pakai lib/vncpasswd.py (d3des persis TigerVNC, terverifikasi).
+    printf '%s' "$VNC_PW" | python3 lib/vncpasswd.py
+    unset VNC_PW VNC_PW2
   fi
 
+  # PENTING: perintah terakhir harus jalan di FOREGROUND (exec).
+  # Kalau semua di-background (&), TigerVNC mengira sesi langsung
+  # selesai -> "Session startup cleanly exited too early".
   mkdir -p "$HOME/.vnc"
   cat > "$HOME/.vnc/xstartup" <<'EOF'
 #!/bin/sh
-openbox-session &
 xterm -geometry 100x30+10+10 &
+if command -v openbox-session >/dev/null 2>&1; then
+  exec openbox-session
+else
+  exec xterm -geometry 120x40+10+10
+fi
 EOF
   chmod +x "$HOME/.vnc/xstartup"
 
   vnc_running || {
     echo "== start VNC display :$DISPLAY_NUM =="
     vncserver ":$DISPLAY_NUM" -localhost yes -geometry 1280x800 -depth 24 >/dev/null
+    sleep 3
+    if ! vnc_running; then
+      echo "✘ VNC gagal start. Isi log:"
+      tail -20 "$HOME/.vnc/$(hostname):$DISPLAY_NUM.log" 2>/dev/null | sed 's/^/    /'
+      exit 1
+    fi
   }
   web_running || {
     echo "== start noVNC di port $WEB_PORT =="

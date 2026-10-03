@@ -11,6 +11,11 @@
 set -e
 cd "$(dirname "$0")"
 
+if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
+  echo "✘ Jangan pakai sudo untuk script ini — jalankan sebagai user biasa."
+  exit 1
+fi
+
 PROFILE_DIR=".gflow/profiles/default"
 
 has_display() { [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; }
