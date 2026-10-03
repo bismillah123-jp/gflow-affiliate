@@ -23,8 +23,11 @@ ensure_cloudflared() {
   command -v cloudflared >/dev/null 2>&1 && return 0
   echo "== download cloudflared (sekali aja) =="
   mkdir -p "$HOME/.local/bin"
-  curl -sL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" \
-    -o "$HOME/.local/bin/cloudflared"
+  if ! curl -sL --max-time 120 "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" \
+    -o "$HOME/.local/bin/cloudflared"; then
+    echo "✘ download cloudflared gagal (cek internet). Lanjut tanpa link otomatis."
+    return 1
+  fi
   chmod +x "$HOME/.local/bin/cloudflared"
 }
 
@@ -48,7 +51,7 @@ install_deps() {
     curl -sL "https://github.com/novnc/noVNC/archive/refs/tags/$NOVNC_VER.tar.gz" \
       | tar xz -C "$NOVNC_DIR" --strip-components=1
   fi
-  ensure_cloudflared
+  ensure_cloudflared || true   # gagal download -> lanjut tanpa link otomatis
 }
 
 vnc_running()   { pgrep -f "Xtigervnc.*:$DISPLAY_NUM" >/dev/null 2>&1; }
@@ -89,24 +92,36 @@ EOF
   if ! quick_running; then
     echo "== bikin link publik otomatis (quick tunnel) =="
     : > "$QUICK_LOG"
-    nohup cloudflared tunnel --url "http://127.0.0.1:$WEB_PORT" \
-      >>"$QUICK_LOG" 2>&1 &
-    for _ in $(seq 1 40); do
-      [ -n "$(quick_url)" ] && break
-      sleep 1
-    done
+    if command -v cloudflared >/dev/null 2>&1; then
+      nohup cloudflared tunnel --url "http://127.0.0.1:$WEB_PORT" \
+        >>"$QUICK_LOG" 2>&1 &
+      echo -n "nunggu URL tunnel "
+      for _ in $(seq 1 40); do
+        [ -n "$(quick_url)" ] && break
+        echo -n "."
+        sleep 1
+      done
+      echo ""
+      if [ -z "$(quick_url)" ]; then
+        echo "✘ URL tunnel tidak muncul. Isi log terakhir:"
+        tail -15 "$QUICK_LOG" | sed 's/^/    /'
+      fi
+    else
+      echo "✘ cloudflared tidak tersedia — lewati link otomatis."
+    fi
   fi
 
   URL="$(quick_url)"
   PUB_OK=0
   if [ -n "$URL" ]; then
-    echo "== verifikasi link publik =="
-    for _ in $(seq 1 6); do
-      if curl -s --max-time 15 "$URL/vnc.html" 2>/dev/null | grep -q "noVNC"; then
+    echo "== verifikasi link publik ($URL) =="
+    for _ in $(seq 1 4); do
+      if curl -s --max-time 8 "$URL/vnc.html" 2>/dev/null | grep -q "noVNC"; then
         PUB_OK=1; break
       fi
-      sleep 5
+      echo -n "."; sleep 5
     done
+    echo ""
   fi
   if [ "$PUB_OK" = "0" ]; then
     # tunnel ke-block di jaringan ini (mis. sandbox tanpa UDP/egress bebas)
