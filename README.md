@@ -83,16 +83,17 @@ persis seperti Chrome Linux, lalu verifikasi via `gflow doctor`.
 **Opsi 2 — VNC via link Cloudflare (login manual di browser HP).**
 ```bash
 ./login.sh --vnc
+# atau: VNC_HOSTNAME=vnc.domainmu.id ./vnc.sh start   (tampilkan link jadi)
 ```
-Muncul link `https://vnc.sirihsan.my.id/vnc.html` — buka di HP,
-masukkan password VNC, buka Terminal di dalam VNC, lalu:
+Script menampilkan URL yang harus dibuka — hostname publiknya ikut
+settingan tunnel Cloudflare-mu sendiri (petakan satu hostname ke
+`http://127.0.0.1:6080` di dashboard). Buka link di HP, masukkan
+password VNC, buka Terminal di dalam VNC, lalu:
 ```bash
 cd ~/workspace/gflow-affiliate && ./login.sh   # login di Chrome yang muncul
 ./vnc.sh stop                                    # matikan VNC setelah selesai
 ```
-Agar link publik jalan, tambahkan sekali di dashboard Cloudflare
-(Zero Trust → Tunnels → Public Hostname): `vnc.sirihsan.my.id` →
-`http://127.0.0.1:6080`. Jangan biarkan VNC nyala terus.
+Jangan biarkan VNC nyala terus.
 
 **Opsi 3 — Pindah profil dari laptop (ada layar).**
 ```bash

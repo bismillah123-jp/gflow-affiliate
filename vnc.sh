@@ -20,8 +20,10 @@ VNC_PORT=$((5900 + DISPLAY_NUM))
 WEB_PORT="${VNC_WEB_PORT:-6080}"
 NOVNC_DIR="$HOME/.local/share/novnc"
 NOVNC_VER="v1.5.0"
-HOSTNAME_DEFAULT="vnc.sirihsan.my.id"
-VNC_HOSTNAME="${VNC_HOSTNAME:-$HOSTNAME_DEFAULT}"
+# Link publik ikut settingan tunnel-mu sendiri (jangan dipatok di sini).
+# Kalau mau script langsung menampilkan link jadi, isi VNC_HOSTNAME, misal:
+#   VNC_HOSTNAME=vnc.contoh.id ./vnc.sh start
+VNC_HOSTNAME="${VNC_HOSTNAME:-}"
 
 need_pkg() { dpkg -s "$1" >/dev/null 2>&1 || echo "$1"; }
 
@@ -80,12 +82,20 @@ EOF
     sleep 1
   }
 
+  if [ -n "$VNC_HOSTNAME" ]; then
+    PUBLIC_LINK="  https://$VNC_HOSTNAME/vnc.html"
+  else
+    PUBLIC_LINK="  https://<hostname-pilihanmu>/vnc.html   (isi VNC_HOSTNAME kalau mau tampil otomatis)"
+  fi
+
   cat <<EOF
 
 ================ VNC SIAP ================
-Link (buka di HP/laptop):
+Buka di HP/laptop:
 
-  https://$VNC_HOSTNAME/vnc.html
+$PUBLIC_LINK
+
+(Lokal, kalau kamu SSH dengan port-forward: http://127.0.0.1:$WEB_PORT/vnc.html)
 
 Login dengan password VNC yang tadi dibuat, lalu di dalam VNC:
   1. buka Terminal (sudah terbuka otomatis)
@@ -95,11 +105,11 @@ Login dengan password VNC yang tadi dibuat, lalu di dalam VNC:
 Setelah login sukses:  ./vnc.sh stop
 
 CATATAN:
-- Agar link di atas bisa diakses, tambahkan SEKALI di dashboard
-  Cloudflare → Zero Trust → Tunnels → Public Hostname:
-    $VNC_HOSTNAME  ->  http://127.0.0.1:$WEB_PORT
+- Petakan SATU hostname di tunnel Cloudflare-mu ke:
+    http://127.0.0.1:$WEB_PORT
+  (dashboard Cloudflare → Zero Trust → Tunnels → Public Hostname → Add)
 - VNC hanya jalan saat kamu butuh; jangan dibiarkan nyala.
-- (Opsional, lebih aman) pasang Cloudflare Access di depan hostname ini.
+- (Opsional, lebih aman) pasang Cloudflare Access di depan hostname itu.
 ==========================================
 EOF
 }
