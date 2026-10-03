@@ -176,8 +176,12 @@ def main() -> None:
         rest[s](slug)
 
     out = ROOT / "products" / slug / "final.mp4"
-    print(f"\nPIPELINE SELESAI ✔  ->  {out} "
-          f"({'ADA' if out.exists() else 'TIDAK ADA!'})")
+    if "finish" in stages and out.exists():
+        print(f"\nPIPELINE SELESAI ✔  ->  {out} (ADA)")
+    elif "finish" in stages:
+        die(f"finish gagal: {out} tidak ada")
+    else:
+        print(f"\nTAHAP {', '.join(stages)} SELESAI ✔  (slug: {slug})")
 
 
 if __name__ == "__main__":

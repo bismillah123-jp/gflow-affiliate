@@ -18,7 +18,20 @@ from common import ROOT, is_dry_run, log, die, run, product_dir, load_json, save
 
 
 def ddg_search(keywords: str, n: int) -> list:
-    """Return list[{image, title, source}]."""
+    """Return list[{image, title, source}]. Coba ddgs dulu, fallback ke curl DDG."""
+    try:
+        return _ddg_search_lib(keywords, n)
+    except Exception as e:
+        log(f"ddgs gagal ({type(e).__name__}: {str(e)[:80]}) — coba fallback curl DDG")
+    try:
+        return _ddg_search_curl(keywords, n)
+    except Exception as e:
+        die(f"pencarian gambar gagal semua jalur ({str(e)[:100]}). "
+            f"Cek koneksi / coba lagi nanti.")
+    return []
+
+
+def _ddg_search_lib(keywords: str, n: int) -> list:
     try:
         from ddgs import DDGS
     except ImportError:
@@ -32,6 +45,37 @@ def ddg_search(keywords: str, n: int) -> list:
         if url.startswith("https://"):
             out.append({"image": url, "title": r.get("title", ""),
                         "source": r.get("source", "")})
+    return out
+
+
+def _ddg_search_curl(keywords: str, n: int) -> list:
+    """Fallback tanpa paket ddgs: ambil token vqd lalu panggil i.js via curl."""
+    import json as _json
+    import re as _re
+    import urllib.parse as _up
+    q = _up.quote_plus(keywords)
+    ua = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+    page = subprocess.run(
+        ["curl", "-sL", "--max-time", "30", "-A", ua,
+         f"https://duckduckgo.com/?q={q}&iar=images&iax=images&ia=images"],
+        capture_output=True, text=True, timeout=45).stdout
+    m = _re.search(r"vqd='([\d-]+)'", page)
+    if not m:
+        raise RuntimeError("token vqd tidak ketemu")
+    js = subprocess.run(
+        ["curl", "-s", "--max-time", "30", "-A", ua,
+         f"https://duckduckgo.com/i.js?q={q}&vqd={m.group(1)}"],
+        capture_output=True, text=True, timeout=45).stdout
+    data = _json.loads(js)
+    out = []
+    for r in data.get("results", [])[:n * 2]:
+        url = r.get("image") or ""
+        if url.startswith("https://"):
+            out.append({"image": url, "title": r.get("title", ""),
+                        "source": r.get("source", "")})
+    if not out:
+        raise RuntimeError("tidak ada hasil gambar")
+    log(f"fallback curl DDG: {len(out)} hasil")
     return out
 
 
