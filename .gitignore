@@ -1,0 +1,28 @@
+# hasil kerja per produk
+products/
+# output gflow
+gflow-output/
+gflow-output/
+# venv & cache
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# sesi browser gflow (berisi cookie login — JANGAN di-commit)
+.gflow/
+# file sementara dry-run
+.dryrun_gflow.json
+# kredensial / file pribadi lain
+.cf-quick-*
+.vnc-pass
+*.token
+*.json.bak
+# media besar
+*.mp4
+*.mp3
+*.wav
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+node_modules/
