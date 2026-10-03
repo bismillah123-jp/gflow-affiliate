@@ -34,19 +34,47 @@ check() {
   fi
 }
 
-chrome_login_running() {
-  pgrep -f "\.gflow/profiles/default" >/dev/null 2>&1
+GFLOW_PROFILE_DIR=".gflow/profiles/default"
+FLOW_URL="https://labs.google/fx/tools/flow"
+
+chrome_pids_for_profile() {
+  # trik [.] biar pgrep nggak match command-line-nya sendiri
+  pgrep -f "[.]gflow/profiles/default" 2>/dev/null | grep -vx "$$" || true
 }
 
 direct_login() {
   echo "== login langsung =="
-  if chrome_login_running; then
-    echo "Chrome login sepertinya SUDAH terbuka (profil gflow sedang dipakai)."
-    echo "Selesaikan login Google di jendela itu."
-  else
-    echo "Membuka jendela Chrome..."
-    gflow auth login
+  # Bersihkan Chrome gflow yang nyangkut dari jalan sebelumnya.
+  # Chrome-nya gflow di-spawn detached (imun Ctrl+C); tiap spawn baru
+  # di profil yang sama = tab baru numpuk. Ini sumber "tab nyepam".
+  local pids
+  pids=$(chrome_pids_for_profile)
+  if [ -n "$pids" ]; then
+    echo "Menutup Chrome gflow lama yang masih nyangkut..."
+    # shellcheck disable=SC2086
+    kill $pids 2>/dev/null || true
+    sleep 2
+    pkill -9 -f "[.]gflow/profiles/default" 2>/dev/null || true
   fi
+  rm -f "$GFLOW_PROFILE_DIR/SingletonLock" "$GFLOW_PROFILE_DIR/SingletonCookie" \
+        "$GFLOW_PROFILE_DIR/SingletonSocket" "$GFLOW_PROFILE_DIR/DevToolsActivePort"
+  mkdir -p "$GFLOW_PROFILE_DIR"
+
+  echo "Membuka SATU jendela Chrome login..."
+  # Luncurkan langsung (bukan via `gflow auth login`) supaya bisa pakai
+  # flag anti-crash di container/VNC: --disable-dev-shm-usage --disable-gpu.
+  # Tetap Chrome biasa tanpa remote-debugging (syarat login Google).
+  local chrome_bin
+  chrome_bin=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
+  if [ -z "$chrome_bin" ]; then
+    echo "✘ Chrome/Chromium tidak ketemu. Install Google Chrome dulu."
+    exit 1
+  fi
+  "$chrome_bin" --user-data-dir="$PWD/$GFLOW_PROFILE_DIR" \
+    --no-first-run --no-default-browser-check \
+    --disable-dev-shm-usage --disable-gpu \
+    "$FLOW_URL" >/dev/null 2>&1 &
+  disown 2>/dev/null || true
   echo ""
   echo "Selesaikan login Google di jendela Chrome tersebut,"
   read -rp "lalu tekan ENTER di sini untuk verifikasi... "
