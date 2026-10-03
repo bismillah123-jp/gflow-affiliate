@@ -27,3 +27,6 @@ __pycache__/
 .vscode/
 node_modules/
 attic/
+
+# state dry-run (jangan di-commit)
+.dryrun_*.json
