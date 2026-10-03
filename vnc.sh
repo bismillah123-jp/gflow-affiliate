@@ -10,8 +10,8 @@
 # Link tampil setelah 'start'. Agar link publik jalan, tambahkan SATU KALI
 # di dashboard Cloudflare (Zero Trust → Networks → Tunnels → tunnel kamu
 # → Public Hostname → Add):
-#   Subdomain : vnc        (bisa diganti via VNC_HOSTNAME)
-#   Domain    : sirihsan.my.id
+#   Subdomain : (bebas, misal vnc)
+#   Domain    : (domainmu sendiri)
 #   Service   : http://127.0.0.1:6080
 set -euo pipefail
 
