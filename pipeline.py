@@ -1,28 +1,31 @@
 #!/usr/bin/env python3
 """
-pipeline.py — Pipeline otomatis video affiliate TikTok/Shopee via gflow-cli.
+pipeline.py — Pipeline otomatis video affiliate TikTok/Shopee via Google Flow.
+
+TANPA gflow-cli: Flow dikendalikan langsung via Playwright (lib/flow_browser.py).
 
 Alur (7 tahap):
   1. research   : riset produk viral (curated/manual/trends)
   2. images     : download gambar katalog (DuckDuckGo, tanpa API key)
-  3. hd         : HD + perjelas produk via Nano Banana 2 (gflow)
-  4. storyboard : storyboard BERUPA GAMBAR per scene via Nano Banana 2 (gflow)
-  5. video      : storyboard -> video 10 dtk via Omni Flash (gflow, frames mode)
+  3. hd         : HD + perjelas produk via Nano Banana 2 (browser Flow)
+  4. storyboard : storyboard BERUPA GAMBAR per scene via Nano Banana 2
+  5. video      : storyboard -> video 10 dtk via Omni Flash (frames mode)
   6. tts        : voice-over Bahasa Indonesia via edge-tts (tanpa API key)
   7. finish     : mux video + VO (+teks overlay opsional) via ffmpeg
 
-Konsistensi produk dijaga via gflow character (referensi visual `aff-<slug>`).
+Konsistensi produk dijaga via referensi visual `aff-<slug>` (ingredient).
 Anti-anomali via ANOMALY_GUARD di setiap prompt (lihat lib/prompts.py).
 
-Syarat sekali per mesin: ./setup.sh lalu `gflow auth login` (interaktif),
-karena gflow mengendalikan Chrome + sesi Google Flow milikmu.
+Syarat sekali per mesin:
+  ./setup.sh                        # install deps + playwright chromium
+  python3 pipeline.py --auth        # login Google manual sekali, sesi tersimpan
 
 Pakai:
   python3 pipeline.py --auto                       # full pipeline, produk top viral
   python3 pipeline.py --product <slug>             # full pipeline 1 produk
   python3 pipeline.py --product <slug> --from hd   # mulai dari tahap hd
   python3 pipeline.py --product <slug> --only video
-  python3 pipeline.py --auto --dry-run             # uji end-to-end TANPA API/browser
+  python3 pipeline.py --auto --dry-run             # uji end-to-end TANPA browser/kuota
 """
 import argparse
 import os
@@ -47,16 +50,15 @@ def sh(*cmd: str) -> None:
 
 
 def preflight() -> None:
-    """Pastikan sesi gflow valid SEBELUM tahap berat jalan."""
-    import subprocess
-    log("preflight: cek sesi gflow ...")
-    r = subprocess.run(["gflow", "doctor"],
-                       capture_output=True, text=True, timeout=300)
-    if r.returncode != 0:
-        die("sesi Google Flow belum valid.\n"
-            "  Jalankan:  ./login.sh\n"
-            "  (di server headless: ./login.sh --unpack <file-profil>)")
-    log("preflight OK: sesi gflow valid")
+    """Pastikan user sudah login Flow SEBELUM tahap berat jalan."""
+    sys.path.insert(0, str(LIB))
+    from flow_browser import is_authed
+    log("preflight: cek sesi Flow ...")
+    if not is_authed():
+        die("belum login Google Flow.\n"
+            "  Jalankan sekali:  python3 pipeline.py --auth\n"
+            "  (browser kebuka — login Google manual, lalu tutup)")
+    log("preflight OK: sesi Flow tersimpan")
 
 
 def main() -> None:
@@ -67,8 +69,8 @@ def main() -> None:
                    help="pilih produk skor viral tertinggi")
     a.add_argument("--manual-name", default="",
                    help="nama produk (mode manual, tanpa riset)")
-    a.add_argument("--project", default=os.environ.get("GFLOW_PROJECT", ""),
-                   help="nama Flow project gflow (opsional)")
+    a.add_argument("--auth", action="store_true",
+                   help="login Google Flow sekali (browser manual), lalu keluar")
     a.add_argument("--voice", default=os.environ.get("AFFILIATE_VOICE", ""),
                    help="suara TTS (default id-ID-GadisNeural)")
     a.add_argument("--from", dest="from_stage", default="research",
@@ -78,24 +80,29 @@ def main() -> None:
     a.add_argument("--dry-run", action="store_true",
                    help="uji end-to-end tanpa API key / browser / kuota")
     a.add_argument("--headed", action="store_true",
-                   help="tampilkan browser gflow (debug)")
+                   help="tampilkan browser (debug)")
     args = a.parse_args()
 
     if args.list_stages:
         print("\n".join(f"{i + 1}. {s}" for i, s in enumerate(STAGES)))
         return
 
+    if args.auth:
+        sys.path.insert(0, str(LIB))
+        from flow_browser import auth_interactive
+        auth_interactive()
+        return
+
     if args.dry_run:
         os.environ["AFFILIATE_DRY_RUN"] = "1"
-        log("mode DRY-RUN: semua panggilan gflow/API dipalsukan")
+        log("mode DRY-RUN: semua panggilan browser/API dipalsukan")
 
     if not args.product and not args.auto and not args.manual_name:
         die("tentukan --product, --auto, atau --manual-name")
 
     py = sys.executable
     common = ["--dry-run"] if args.dry_run else []
-    gflow_flags = (["--project", args.project] if args.project else []) \
-        + (["--headed"] if args.headed else [])
+    headed = ["--headed"] if args.headed else []
 
     def stage_research():
         log("== [1/7] research ==")
@@ -115,15 +122,15 @@ def main() -> None:
 
     def stage_hd(slug):
         log("== [3/7] hd (Nano Banana 2) ==")
-        sh(py, str(LIB / "hd_enhance.py"), "--product", slug, *gflow_flags, *common)
+        sh(py, str(LIB / "hd_enhance.py"), "--product", slug, *headed, *common)
 
     def stage_storyboard(slug):
         log("== [4/7] storyboard (gambar) ==")
-        sh(py, str(LIB / "storyboard.py"), "--product", slug, *gflow_flags, *common)
+        sh(py, str(LIB / "storyboard.py"), "--product", slug, *headed, *common)
 
     def stage_video(slug):
         log("== [5/7] video (Omni Flash 10s) ==")
-        sh(py, str(LIB / "gen_video.py"), "--product", slug, *gflow_flags, *common)
+        sh(py, str(LIB / "gen_video.py"), "--product", slug, *headed, *common)
 
     def stage_tts(slug):
         log("== [6/7] tts (VO Bahasa Indonesia) ==")
@@ -151,9 +158,9 @@ def main() -> None:
         die("--auto/--manual-name butuh tahap research untuk resolve slug; "
             "pakai --product <slug> bila mulai dari tengah")
 
-    # preflight gflow sekali sebelum tahap yang butuh browser
-    GFLOW_STAGES = {"hd", "storyboard", "video"}
-    if not args.dry_run and any(s in GFLOW_STAGES for s in stages):
+    # preflight sekali sebelum tahap yang butuh browser
+    BROWSER_STAGES = {"hd", "storyboard", "video"}
+    if not args.dry_run and any(s in BROWSER_STAGES for s in stages):
         preflight()
 
     if "research" in stages:

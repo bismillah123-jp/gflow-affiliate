@@ -7,7 +7,7 @@ Prinsip:
     semua voice-over WAJIB Bahasa Indonesia.
   - ANOMALY_GUARD ditempel di setiap prompt visual — ini pertahanan
     lapis pertama anti tangan-berlebih/jari-aneh/produk berubah.
-  - Konsistensi produk dijaga via gflow character (referensi visual),
+  - Konsistensi produk dijaga via referensi visual (ingredient),
     bukan cuma lewat kata-kata.
 """
 

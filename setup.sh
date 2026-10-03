@@ -1,22 +1,13 @@
 #!/bin/bash
 # setup.sh — siapkan pipeline video affiliate di Linux manapun (sekali aja).
-# Membuat venv .venv, install dependensi Python, install gflow-cli global.
+# Membuat venv .venv, install dependensi Python + browser Playwright.
+# TANPA gflow-cli: Flow dikendalikan langsung via Playwright.
 set -e
 cd "$(dirname "$0")"
 
 echo "== cek python3 =="; python3 --version
-echo "== cek node =="
-command -v node >/dev/null || { echo "Install Node.js 20+: https://nodejs.org"; exit 1; }
-node --version
 echo "== cek ffmpeg =="
 command -v ffmpeg >/dev/null || { echo "Install ffmpeg dulu:"; echo "  Ubuntu/Debian: sudo apt install ffmpeg"; echo "  Fedora: sudo dnf install ffmpeg"; echo "  macOS: brew install ffmpeg"; exit 1; }
-echo "== cek Google Chrome =="
-if command -v google-chrome >/dev/null || command -v chromium >/dev/null || command -v chromium-browser >/dev/null; then
-  echo "Chrome OK"
-else
-  echo "Install Google Chrome: https://www.google.com/chrome/ (dibutuhkan gflow)"
-  exit 1
-fi
 
 echo "== buat venv .venv =="
 python3 -m venv .venv
@@ -24,19 +15,15 @@ python3 -m venv .venv
 echo "== install dependensi python =="
 .venv/bin/pip install -r requirements.txt
 
-echo "== install gflow-cli =="
-if command -v gflow >/dev/null; then
-  echo "gflow sudah ada: $(gflow --version 2>/dev/null || echo ok)"
-else
-  npm install -g @swissmarley/gflow-cli
-fi
+echo "== install browser playwright (chromium) =="
+.venv/bin/playwright install chromium --with-deps 2>/dev/null || .venv/bin/playwright install chromium
 
 echo ""
 echo "SELESAI ✔"
 echo ""
 echo "Langkah terakhir (sekali aja per mesin):"
-echo "  ./login.sh               # login Google Flow (dipandu otomatis)"
-echo "  ./login.sh --check       # verifikasi sesi"
+echo "  .venv/bin/python pipeline.py --auth   # login Google Flow manual sekali"
+echo "  ./login.sh                            # alternatif: login dipandu (menu/VNC)"
 echo ""
 echo "Di server tanpa layar, ./login.sh akan memandu cara pindahan profil"
 echo "login dari laptop (./login.sh --pack di laptop -> --unpack di server)."

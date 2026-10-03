@@ -1,5 +1,7 @@
 #!/bin/bash
 # login.sh — login Google Flow, pilih cara paling gampang buatmu.
+# TANPA gflow-cli: sesi disimpan di profil browser ~/.config/affiliate-flow
+# (dipakai langsung oleh pipeline.py via Playwright).
 #
 #   ./login.sh                        # menu interaktif
 #   ./login.sh --direct               # langsung: butuh layar di mesin ini
@@ -16,68 +18,63 @@ if [ "$(id -u)" = "0" ] && [ -n "${SUDO_USER:-}" ]; then
   exit 1
 fi
 
-PROFILE_DIR=".gflow/profiles/default"
+PROFILE_DIR="$HOME/.config/affiliate-flow"
+AUTH_MARKER="$PROFILE_DIR/.auth_ok"
 
 has_display() { [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; }
 
 check() {
   echo "== cek sesi Flow =="
-  if ! command -v gflow >/dev/null; then
-    echo "✘ perintah 'gflow' belum diinstall. Jalankan ./setup.sh dulu."
-    exit 1
-  fi
-  if gflow doctor; then
-    echo ""; echo "✔ Sesi valid. Pipeline siap jalan."
+  if [ -f "$AUTH_MARKER" ]; then
+    echo ""; echo "✔ Sesi tersimpan di $PROFILE_DIR. Pipeline siap jalan."
   else
-    echo ""; echo "✘ Sesi belum valid. Coba cara login lain: ./login.sh"
+    echo ""; echo "✘ Belum login. Jalankan: python3 pipeline.py --auth"
+    echo "   (atau ./login.sh untuk cara lain)"
     exit 1
   fi
 }
 
-GFLOW_PROFILE_DIR=".gflow/profiles/default"
+FLOW_PROFILE_DIR="$HOME/.config/affiliate-flow"
 FLOW_URL="https://labs.google/fx/tools/flow"
 
 chrome_pids_for_profile() {
   # trik [.] biar pgrep nggak match command-line-nya sendiri
-  pgrep -f "[.]gflow/profiles/default" 2>/dev/null | grep -vx "$$" || true
+  pgrep -f "[.]config/affiliate-flow" 2>/dev/null | grep -vx "$$" || true
 }
 
 direct_login() {
   echo "== login langsung =="
-  # Bersihkan Chrome gflow yang nyangkut dari jalan sebelumnya.
-  # Chrome-nya gflow di-spawn detached (imun Ctrl+C); tiap spawn baru
-  # di profil yang sama = tab baru numpuk. Ini sumber "tab nyepam".
+  # Bersihkan Chrome profil Flow yang nyangkut dari jalan sebelumnya.
   local pids
   pids=$(chrome_pids_for_profile)
   if [ -n "$pids" ]; then
-    echo "Menutup Chrome gflow lama yang masih nyangkut..."
+    echo "Menutup Chrome profil Flow yang masih nyangkut..."
     # shellcheck disable=SC2086
     kill $pids 2>/dev/null || true
     sleep 2
-    pkill -9 -f "[.]gflow/profiles/default" 2>/dev/null || true
+    pkill -9 -f "[.]config/affiliate-flow" 2>/dev/null || true
   fi
-  rm -f "$GFLOW_PROFILE_DIR/SingletonLock" "$GFLOW_PROFILE_DIR/SingletonCookie" \
-        "$GFLOW_PROFILE_DIR/SingletonSocket" "$GFLOW_PROFILE_DIR/DevToolsActivePort"
-  mkdir -p "$GFLOW_PROFILE_DIR"
+  rm -f "$FLOW_PROFILE_DIR/SingletonLock" "$FLOW_PROFILE_DIR/SingletonCookie" \
+        "$FLOW_PROFILE_DIR/SingletonSocket" "$FLOW_PROFILE_DIR/DevToolsActivePort"
+  mkdir -p "$FLOW_PROFILE_DIR"
 
   echo "Membuka SATU jendela Chrome login..."
-  # Luncurkan langsung (bukan via `gflow auth login`) supaya bisa pakai
-  # flag anti-crash di container/VNC: --disable-dev-shm-usage --disable-gpu.
-  # Tetap Chrome biasa tanpa remote-debugging (syarat login Google).
+  # Luncurkan langsung supaya bisa pakai flag anti-crash di container/VNC.
   local chrome_bin
   chrome_bin=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
   if [ -z "$chrome_bin" ]; then
     echo "✘ Chrome/Chromium tidak ketemu. Install Google Chrome dulu."
     exit 1
   fi
-  "$chrome_bin" --user-data-dir="$PWD/$GFLOW_PROFILE_DIR" \
+  "$chrome_bin" --user-data-dir="$FLOW_PROFILE_DIR" \
     --no-first-run --no-default-browser-check \
     --disable-dev-shm-usage --disable-gpu \
     "$FLOW_URL" >/dev/null 2>&1 &
   disown 2>/dev/null || true
   echo ""
   echo "Selesaikan login Google di jendela Chrome tersebut,"
-  read -rp "lalu tekan ENTER di sini untuk verifikasi... "
+  read -rp "lalu tekan ENTER di sini ... "
+  touch "$AUTH_MARKER"
   check
 }
 
@@ -108,8 +105,8 @@ pack() {
     echo "Jalankan './login.sh --direct' dulu di komputer ini untuk login."
     exit 1
   fi
-  OUT="gflow-login-$(date +%Y%m%d).tgz"
-  tar czf "$OUT" .gflow
+  OUT="flow-login-$(date +%Y%m%d).tgz"
+  tar czf "$OUT" -C "$HOME" .config/affiliate-flow
   echo ""
   echo "✔ Profil dikemas: $OUT ($(du -h "$OUT" | cut -f1))"
   echo "Kirim ke server, lalu di server: ./login.sh --unpack $OUT"
@@ -118,7 +115,7 @@ pack() {
 unpack() {
   local file="$1"
   [ -f "$file" ] || { echo "File tidak ketemu: $file"; exit 1; }
-  tar xzf "$file"
+  tar xzf "$file" -C "$HOME"
   echo "✔ Profil dipasang."
   check
 }
@@ -144,11 +141,11 @@ EOF
 
   DI LAPTOP (ada layar):
     ./login.sh --direct     # login di Chrome yang muncul
-    ./login.sh --pack        # -> gflow-login-<tgl>.tgz
+    ./login.sh --pack        # -> flow-login-<tgl>.tgz
 
   DI SERVER INI:
     copy file .tgz ke folder repo ini, lalu:
-    ./login.sh --unpack gflow-login-<tgl>.tgz
+    ./login.sh --unpack flow-login-<tgl>.tgz
 EOF
        ;;
     *) echo "Batal." ;;

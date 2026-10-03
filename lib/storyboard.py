@@ -5,7 +5,8 @@
      data/storyboards/<slug>.json (override khusus, bila ada), atau
      template generik 3-scene (total 10 detik) dari lib/prompts.py
 2. Render tiap scene jadi gambar 9:16 via Nano Banana 2, dengan
-   character referensi produk agar identitas konsisten.
+   referensi produk agar identitas konsisten.
+   (Tanpa gflow-cli — Flow dikendalikan langsung via Playwright.)
 
 Aturan keras:
   - HANYA tangan / POV tangan, tidak ada wajah
@@ -13,7 +14,7 @@ Aturan keras:
     ffmpeg di tahap finish, BUKAN di-generate AI — default: tanpa teks)
   - Anti-anomali via ANOMALY_GUARD di setiap prompt
 
-Usage: storyboard.py --product <slug> [--project NAME] [--dry-run]
+Usage: storyboard.py --product <slug> [--dry-run]
 """
 import argparse
 import os
@@ -23,13 +24,12 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from common import ROOT, is_dry_run, log, die, product_dir, load_json, save_json  # noqa: E402
 from prompts import build_storyboard  # noqa: E402
-import gflow_shim as gflow  # noqa: E402
+import flow_browser as flow  # noqa: E402
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Render storyboard (gambar)")
     ap.add_argument("--product", required=True)
-    ap.add_argument("--project", default=os.environ.get("GFLOW_PROJECT", ""))
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
@@ -62,15 +62,14 @@ def main() -> None:
     sdir.mkdir(parents=True, exist_ok=True)
     for s in sb["scenes"]:
         out = sdir / f"scene{s['n']:02d}.png"
-        gflow.image_generate(
+        flow.image_generate(
             job_id=f"{a.product}-scene{s['n']:02d}",
             prompt=s["keyframe_prompt"],
             out_png=str(out),
             model="Nano Banana 2",
             ratio="9:16",
             character=char_name,
-            headed=a.headed,
-            project=a.project)
+            headed=a.headed)
     log("tahap storyboard selesai")
 
 

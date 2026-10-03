@@ -2,8 +2,8 @@
 
 Bikin video affiliate vertikal 9:16 (±10 detik, voice-over Bahasa Indonesia)
 **otomatis** dari riset produk sampai file final siap upload — pakai
-[`gflow-cli`](https://github.com/swissmarley/gflow-cli) (Nano Banana 2 +
-Omni Flash), `edge-tts`, dan `ffmpeg`. Jalan di Linux manapun.
+Playwright (Nano Banana 2 + Omni Flash langsung di browser),
+`edge-tts`, dan `ffmpeg`. **Tanpa gflow-cli.** Jalan di Linux manapun.
 
 ```
 riset → images → hd → storyboard → video → tts → finish
@@ -14,9 +14,9 @@ riset → images → hd → storyboard → video → tts → finish
 |---|---|---|
 | 1. `research` | Riset produk viral / FYP-potential | kurasi `data/trending_id.json`, manual, atau Google Trends |
 | 2. `images` | Download gambar katalog produk | DuckDuckGo Images (`ddgs`, tanpa API key) |
-| 3. `hd` | HD-kan + perjelas produk, buang background berantakan | Nano Banana 2 via `gflow` |
-| 4. `storyboard` | Storyboard **berupa gambar** (3 scene, total 10 dtk) | Nano Banana 2 via `gflow` |
-| 5. `video` | Storyboard → video 10 dtk beneran (bukan slideshow) | Omni Flash via `gflow` (frames mode) |
+| 3. `hd` | HD-kan + perjelas produk, buang background berantakan | Nano Banana 2 via browser (Playwright) |
+| 4. `storyboard` | Storyboard **berupa gambar** (3 scene, total 10 dtk) | Nano Banana 2 via browser (Playwright) |
+| 5. `video` | Storyboard → video 10 dtk beneran (bukan slideshow) | Omni Flash via browser (frames mode) |
 | 6. `tts` | Voice-over Bahasa Indonesia | `edge-tts` neural (tanpa API key) |
 | 7. `finish` | Mux video + VO (+teks overlay opsional) | `ffmpeg` |
 
@@ -28,7 +28,7 @@ riset → images → hd → storyboard → video → tts → finish
   (tangan anatomis benar — tepat 2 tangan, 5 jari per tangan, tanpa
   anggota tubuh ekstra, tanpa morphing). Dicetak di `lib/prompts.py`
   supaya bisa diaudit/di-tune.
-- **Konsistensi produk**: gambar katalog di-upload sekali sebagai gflow
+- **Konsistensi produk**: gambar katalog di-upload sekali sebagai referensi
   `character` (`aff-<slug>`), lalu dipakai sebagai referensi di semua
   tahap HD, storyboard, dan video — kemasan/label/warna tidak berubah.
 - **Teks di video minimal**: teks overlay TIDAK di-generate AI (rawan
@@ -41,7 +41,7 @@ riset → images → hd → storyboard → video → tts → finish
 
 Jujur dulu biar ekspektasi pas:
 
-1. **Login Google sekali per mesin** — `gflow` mengendalikan Chrome +
+1. **Login Google sekali per mesin** — Playwright memakai profil persistent
    sesi Google Flow milikmu. Jalankan `./login.sh` (otomatis dipandu:
    langsung login bila ada layar, atau pindah profil dari laptop bila
    headless). Setelah itu semuanya bisa `--no-headed` (otomatis).
@@ -60,7 +60,7 @@ Jujur dulu biar ekspektasi pas:
 
 ```bash
 git clone <repo-ini> && cd gflow-affiliate
-./setup.sh            # venv .venv + dependensi + gflow-cli
+./setup.sh            # venv .venv + dependensi + browser playwright
 ./login.sh            # login Google Flow (dipandu, sekali aja)
 ```
 
@@ -77,8 +77,8 @@ kirim `cookies.json` ke folder repo ini, lalu:
 ```bash
 ./login.sh --import-cookies cookies.json
 ```
-Script menulis cookie ke profil gflow dengan enkripsi yang sama
-persis seperti Chrome Linux, lalu verifikasi via `gflow doctor`.
+Script menulis cookie ke profil browser Flow dengan enkripsi yang sama
+persis seperti Chrome Linux.
 
 **Opsi 2 — VNC, link publik otomatis (tanpa setting apa pun).**
 ```bash
@@ -101,12 +101,12 @@ Jangan biarkan VNC nyala terus.
 **Opsi 3 — Pindah profil dari laptop (ada layar).**
 ```bash
 # di LAPTOP:  ./login.sh --direct   # login di Chrome yang muncul
-#             ./login.sh --pack      # -> gflow-login-<tgl>.tgz
-# di SERVER:  ./login.sh --unpack gflow-login-<tgl>.tgz
+#             ./login.sh --pack      # -> flow-login-<tgl>.tgz
+# di SERVER:  ./login.sh --unpack flow-login-<tgl>.tgz
 ```
 
 Cek kapan saja: `./login.sh --check`. Pipeline juga otomatis
-`preflight` (`gflow doctor`) sebelum tahap berat jalan.
+`preflight` (cek marker login) sebelum tahap berat jalan.
 
 Butuh: Python 3.10+, Node.js 20+, Google Chrome, ffmpeg, internet.
 
@@ -167,7 +167,7 @@ Tahap yang sudah selesai otomatis di-skip (aman diulang / dilanjut).
 
 | Var | Default | Guna |
 |---|---|---|
-| `GFLOW_PROJECT` | — | nama Flow project gflow |
+| `AFFILIATE_VIDEO_MODEL` | `Omni Flash` | override model video |
 | `GFLOW_VIDEO_MODEL` | `Omni Flash` | model video |
 | `GFLOW_CHROME_PATH` | — | path Chrome non-standar |
 | `AFFILIATE_VOICE` | `id-ID-GadisNeural` | suara VO |
@@ -188,15 +188,15 @@ Trends ID (best-effort).
 key), download 3 teratas pakai curl + Referer, verifikasi `file(1)`,
 simpan manifest.
 
-**3. hd** — `lib/hd_enhance.py`. `gflow character create --image`
-katalog → referensi `aff-<slug>`, lalu `gflow image --character`
+**3. hd** — `lib/hd_enhance.py`. gambar katalog → referensi `aff-<slug>`, lalu
+generate image via browser dengan ingredient referensi
 model Nano Banana 2 dengan prompt HD (produk identik, background bersih).
 
 **4. storyboard** — `lib/storyboard.py`. Susun `storyboard.json`
 (override di `data/storyboards/<slug>.json` bila ada, else template
 3-scene). Render tiap scene 9:16 via Nano Banana 2 + character.
 
-**5. video** — `lib/gen_video.py`. `gflow video --model "Omni Flash"
+**5. video** — `lib/gen_video.py`. browser Flow, model "Omni Flash" (frames mode)
 --duration 10 --ratio 9:16 --start-frame scene01.png --end-frame
 scene03.png --character …` — satu klip 10 detik kontinu, audio ambient
 saja (tanpa dialog; VO ditambah terpisah agar bahasa terjamin).
@@ -211,10 +211,10 @@ VO di-mix, opsional `drawtext` overlay, verifikasi stream video+audio.
 
 | Gejala | Solusi |
 |---|---|
-| `gflow: command not found` | `npm install -g @swissmarley/gflow-cli` |
-| `Google Flow login is required` | `./login.sh` (atau manual: `gflow auth login` → `gflow doctor`) |
+| `belum login Flow` | `python3 pipeline.py --auth` (login manual sekali) |
+| `belum login Flow` | `python3 pipeline.py --auth` atau `./login.sh` |
 | Tangan/jari aneh di hasil | Perketat `ANOMALY_GUARD` di `lib/prompts.py`; generate ulang scene |
-| Produk berubah di video | Pastikan character `aff-<slug>` terbuat (`gflow character list`); pakai gambar katalog yang jelas |
+| Produk berubah di video | Pastikan referensi `aff-<slug>` ada di `~/.config/affiliate-flow/references/`; pakai gambar katalog yang jelas |
 | VO kepanjangan | Sudah auto rate-fit; bila masih, pendekkan `vo_line` di override storyboard |
 | `edge-tts` timeout di balik proxy | Set `https_proxy`/`HTTPS_PROXY`; butuh internet langsung ke Microsoft |
 | `pytrends` 429 | Normal (rate-limit Google); fallback otomatis ke kurasi |
@@ -232,7 +232,7 @@ VO di-mix, opsional `drawtext` overlay, verifikasi stream video+audio.
 ├── lib/
 │   ├── common.py        # util: run, dry-run, placeholder via ffmpeg
 │   ├── prompts.py       # SEMUA prompt + ANOMALY_GUARD + naskah VO
-│   ├── gflow_shim.py    # pembungkus gflow-cli (+ dry-run)
+│   ├── flow_browser.py  # otomasi Playwright ke Flow (+ dry-run)
 │   ├── research.py      # tahap 1
 │   ├── fetch_images.py  # tahap 2
 │   ├── hd_enhance.py    # tahap 3
@@ -247,6 +247,6 @@ VO di-mix, opsional `drawtext` overlay, verifikasi stream video+audio.
 
 ## 📜 Lisensi
 
-MIT — lihat `LICENSE`. `gflow-cli` © swissmarley (MIT).
+MIT — lihat `LICENSE`.
 Pipeline ini tidak berafiliasi dengan Google; patuhi ToS Google Flow
 dan kuota akunmu.

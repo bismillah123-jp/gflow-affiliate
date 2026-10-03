@@ -1,4 +1,5 @@
 # Dependensi Python (install via ./setup.sh ke .venv)
-ddgs>=9.0            # pencarian gambar katalog (tanpa API key)
-edge-tts>=7.0        # voice-over Bahasa Indonesia neural (tanpa API key)
-pytrends>=4.9        # riset Google Trends (opsional, best-effort)
+playwright>=1.40        # otomasi browser Google Flow (tanpa gflow-cli)
+ddgs>=9.0               # pencarian gambar katalog (tanpa API key)
+edge-tts>=7.0           # voice-over Bahasa Indonesia neural (tanpa API key)
+pytrends>=4.9           # riset Google Trends (opsional, best-effort)
